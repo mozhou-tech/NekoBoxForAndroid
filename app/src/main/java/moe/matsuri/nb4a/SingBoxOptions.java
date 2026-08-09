@@ -133,6 +133,8 @@ public class SingBoxOptions {
 
         public String control_url;
 
+        public String domain_resolver;
+
         public Boolean ephemeral;
 
         public String hostname;

@@ -254,6 +254,7 @@ fun buildConfig(
                     .resolve("headscale/default").absolutePath
                 auth_key = DataStore.headscaleAuthKey.trim().takeIf { it.isNotEmpty() }
                 control_url = headscaleControlUrl
+                domain_resolver = "dns-direct"
                 ephemeral = DataStore.headscaleEphemeral
                 hostname = HeadscaleConfig.nodeName(
                     DataStore.headscaleNodePrefix,

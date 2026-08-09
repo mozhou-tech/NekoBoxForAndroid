@@ -48,6 +48,7 @@ class HeadscaleConfigTest {
             type = "tailscale"
             tag = HeadscaleConfig.ENDPOINT_TAG
             control_url = "https://headscale.example.com"
+            domain_resolver = "dns-direct"
             hostname = "neko-pixel-9"
         }
         val options = MyOptions().apply {
@@ -58,6 +59,7 @@ class HeadscaleConfigTest {
         val values = endpointMap.single() as Map<*, *>
         assertEquals("tailscale", values["type"])
         assertEquals("headscale", values["tag"])
+        assertEquals("dns-direct", values["domain_resolver"])
         assertEquals("neko-pixel-9", values["hostname"])
     }
 }
