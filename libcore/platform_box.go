@@ -3,10 +3,10 @@ package libcore
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"libcore/procfs"
 	"log"
+	"net"
 	"net/netip"
 	"strings"
 	"syscall"
@@ -18,6 +18,7 @@ import (
 	sblog "github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	tun "github.com/sagernet/sing-tun"
+	"github.com/sagernet/sing/common/control"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"
 	N "github.com/sagernet/sing/common/network"
@@ -89,11 +90,53 @@ func (w *boxPlatformInterfaceWrapper) CreateDefaultInterfaceMonitor(l logger.Log
 }
 
 func (w *boxPlatformInterfaceWrapper) UsePlatformInterfaceGetter() bool {
-	return false
+	// Android apps cannot read the kernel routing table through netlink. Supply
+	// interfaces through the platform bridge so Tailscale can initialize netmon.
+	return true
+}
+
+type androidNetworkInterface struct {
+	Index        int      `json:"index"`
+	MTU          int      `json:"mtu"`
+	Name         string   `json:"name"`
+	HardwareAddr string   `json:"hardware_address"`
+	Flags        int      `json:"flags"`
+	Addresses    []string `json:"addresses"`
 }
 
 func (w *boxPlatformInterfaceWrapper) Interfaces() ([]adapter.NetworkInterface, error) {
-	return nil, errors.New("wtf")
+	var androidInterfaces []androidNetworkInterface
+	err := json.Unmarshal([]byte(intfBox.NetworkInterfaces()), &androidInterfaces)
+	if err != nil {
+		return nil, fmt.Errorf("decode Android interfaces: %w", err)
+	}
+	interfaces := make([]adapter.NetworkInterface, 0, len(androidInterfaces))
+	for _, androidInterface := range androidInterfaces {
+		var hardwareAddr net.HardwareAddr
+		if androidInterface.HardwareAddr != "" {
+			hardwareAddr, err = net.ParseMAC(androidInterface.HardwareAddr)
+			if err != nil {
+				return nil, fmt.Errorf("decode hardware address for %s: %w", androidInterface.Name, err)
+			}
+		}
+		addresses := make([]netip.Prefix, 0, len(androidInterface.Addresses))
+		for _, address := range androidInterface.Addresses {
+			prefix, parseErr := netip.ParsePrefix(address)
+			if parseErr != nil {
+				return nil, fmt.Errorf("decode address for %s: %w", androidInterface.Name, parseErr)
+			}
+			addresses = append(addresses, prefix)
+		}
+		interfaces = append(interfaces, adapter.NetworkInterface{Interface: control.Interface{
+			Index:        androidInterface.Index,
+			MTU:          androidInterface.MTU,
+			Name:         androidInterface.Name,
+			HardwareAddr: hardwareAddr,
+			Flags:        net.Flags(androidInterface.Flags),
+			Addresses:    addresses,
+		}})
+	}
+	return interfaces, nil
 }
 
 func (w *boxPlatformInterfaceWrapper) IncludeAllNetworks() bool {

@@ -8,6 +8,7 @@ import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.ProxyEntity.Companion.TYPE_CONFIG
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.fmt.ConfigBuildResult.IndexEntity
+import io.nekohasekai.sagernet.fmt.headscale.HeadscaleConfig
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.fmt.hysteria.buildSingBoxOutboundHysteriaBean
 import io.nekohasekai.sagernet.fmt.internal.ChainBean
@@ -133,6 +134,13 @@ fun buildConfig(
     val domainListDNSDirectForce = mutableListOf<String>()
     val bypassDNSBeans = hashSetOf<AbstractBean>()
     val isVPN = DataStore.serviceMode == Key.MODE_VPN
+    val headscaleRequested = DataStore.headscaleEnabled && !forTest && !forExport && isVPN
+    val headscaleControlUrl = DataStore.headscaleControlUrl.trim().trimEnd('/')
+    if (headscaleRequested && headscaleControlUrl.toHttpUrlOrNull() == null) {
+        throw IllegalArgumentException("Invalid Headscale control URL")
+    }
+    val headscaleEnabled = headscaleRequested && headscaleControlUrl.isNotBlank()
+    val headscaleMagicDnsSuffix = DataStore.headscaleMagicDnsSuffix.trim().trim('.')
     val bind = if (!forTest && DataStore.allowAccess) "0.0.0.0" else LOCALHOST
     val remoteDns = DataStore.remoteDns.split("\n")
         .mapNotNull { dns -> dns.trim().takeIf { it.isNotBlank() && !it.startsWith("#") } }
@@ -236,12 +244,42 @@ fun buildConfig(
         }
 
         outbounds = mutableListOf()
+        endpoints = mutableListOf()
+
+        if (headscaleEnabled) {
+            endpoints.add(TailscaleEndpointOptions().apply {
+                type = "tailscale"
+                tag = HeadscaleConfig.ENDPOINT_TAG
+                state_directory = SagerNet.application.noBackupFilesDir
+                    .resolve("headscale/default").absolutePath
+                auth_key = DataStore.headscaleAuthKey.trim().takeIf { it.isNotEmpty() }
+                control_url = headscaleControlUrl
+                ephemeral = DataStore.headscaleEphemeral
+                hostname = HeadscaleConfig.nodeName(
+                    DataStore.headscaleNodePrefix,
+                    HeadscaleConfig.deviceName(SagerNet.application),
+                )
+                accept_routes = DataStore.headscaleAcceptRoutes
+            })
+        }
 
         // init routing object
         route = RouteOptions().apply {
             auto_detect_interface = true
             rules = mutableListOf()
             rule_set = mutableListOf()
+        }
+        if (headscaleEnabled) {
+            route.rules.add(Rule_DefaultOptions().apply {
+                ip_cidr = HeadscaleConfig.allRoutes(DataStore.headscaleAdditionalRoutes)
+                outbound = HeadscaleConfig.ENDPOINT_TAG
+            })
+            if (headscaleMagicDnsSuffix.isNotEmpty()) {
+                route.rules.add(Rule_DefaultOptions().apply {
+                    domain_suffix = listOf(headscaleMagicDnsSuffix)
+                    outbound = HeadscaleConfig.ENDPOINT_TAG
+                })
+            }
         }
 
         // returns outbound tag
@@ -642,6 +680,19 @@ fun buildConfig(
             }
         }
 
+        if (headscaleEnabled && headscaleMagicDnsSuffix.isNotEmpty()) {
+            dns.servers.add(TailscaleDNSServerOptions().apply {
+                type = "tailscale"
+                tag = HeadscaleConfig.DNS_TAG
+                endpoint = HeadscaleConfig.ENDPOINT_TAG
+                accept_default_resolvers = false
+            })
+            dns.rules.add(DNSRule_DefaultOptions().apply {
+                domain_suffix = listOf(headscaleMagicDnsSuffix)
+                server = HeadscaleConfig.DNS_TAG
+            })
+        }
+
         dns.servers.add(DNSServerOptions().apply {
             address = "rcode://success"
             tag = "dns-block"
@@ -694,7 +745,7 @@ fun buildConfig(
                 port = listOf(53)
                 action = "hijack-dns"
             })
-            if (DataStore.bypassLanInCore) {
+            if (DataStore.bypassLanInCore || headscaleEnabled && DataStore.bypassLan) {
                 route.rules.add(Rule_DefaultOptions().apply {
                     outbound = TAG_BYPASS
                     ip_is_private = true

@@ -113,9 +113,41 @@ public class SingBoxOptions {
 
         public List<SingBoxOption> outbounds;
 
+        public List<SingBoxOption> endpoints;
+
         public RouteOptions route;
 
         public ExperimentalOptions experimental;
+
+    }
+
+    public static class TailscaleEndpointOptions extends SingBoxOption {
+
+        public String type;
+
+        public String tag;
+
+        public String state_directory;
+
+        public String auth_key;
+
+        public String control_url;
+
+        public Boolean ephemeral;
+
+        public String hostname;
+
+        public Boolean accept_routes;
+
+    }
+
+    public static class TailscaleDNSServerOptions extends DNSServerOptions {
+
+        public String type;
+
+        public String endpoint;
+
+        public Boolean accept_default_resolvers;
 
     }
 

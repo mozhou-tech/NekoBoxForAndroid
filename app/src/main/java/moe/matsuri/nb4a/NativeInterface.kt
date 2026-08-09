@@ -18,6 +18,18 @@ import libcore.BoxPlatformInterface
 import libcore.Libcore
 import libcore.NB4AInterface
 import java.net.InetSocketAddress
+import java.net.NetworkInterface
+import java.util.Collections
+import moe.matsuri.nb4a.utils.JavaUtil.gson
+
+private data class AndroidNetworkInterface(
+    val index: Int,
+    val mtu: Int,
+    val name: String,
+    val hardware_address: String,
+    val flags: Int,
+    val addresses: List<String>,
+)
 
 class NativeInterface : BoxPlatformInterface, NB4AInterface {
 
@@ -73,6 +85,30 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
             app.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         val connectionInfo = wifiManager.connectionInfo
         return "${connectionInfo.ssid},${connectionInfo.bssid}"
+    }
+
+    override fun networkInterfaces(): String {
+        val interfaces = Collections.list(NetworkInterface.getNetworkInterfaces()).map { networkInterface ->
+            var flags = 0
+            if (networkInterface.isUp) flags = flags or 1 or 32 // up, running
+            if (networkInterface.interfaceAddresses.any { it.broadcast != null }) flags = flags or 2
+            if (networkInterface.isLoopback) flags = flags or 4
+            if (networkInterface.isPointToPoint) flags = flags or 8
+            if (networkInterface.supportsMulticast()) flags = flags or 16
+            AndroidNetworkInterface(
+                index = networkInterface.index,
+                mtu = networkInterface.mtu,
+                name = networkInterface.name,
+                hardware_address = networkInterface.hardwareAddress
+                    ?.joinToString(":") { "%02x".format(it.toInt() and 0xff) }.orEmpty(),
+                flags = flags,
+                addresses = networkInterface.interfaceAddresses.mapNotNull { address ->
+                    val hostAddress = address.address.hostAddress?.substringBefore('%')
+                    hostAddress?.let { "$it/${address.networkPrefixLength.toInt()}" }
+                },
+            )
+        }
+        return gson.toJson(interfaces)
     }
 
     // nb4a interface

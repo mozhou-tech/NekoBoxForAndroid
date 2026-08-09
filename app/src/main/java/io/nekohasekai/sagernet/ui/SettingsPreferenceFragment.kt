@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.preference.*
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -14,9 +15,11 @@ import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
+import io.nekohasekai.sagernet.fmt.headscale.HeadscaleConfig
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.utils.Theme
 import moe.matsuri.nb4a.ui.*
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 class SettingsPreferenceFragment : PreferenceFragmentCompat() {
 
@@ -77,6 +80,58 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         val directDns = findPreference<EditTextPreference>(Key.DIRECT_DNS)!!
         val enableDnsRouting = findPreference<SwitchPreference>(Key.ENABLE_DNS_ROUTING)!!
         val enableFakeDns = findPreference<SwitchPreference>(Key.ENABLE_FAKEDNS)!!
+
+        val headscaleEnabled = findPreference<SwitchPreference>(Key.HEADSCALE_ENABLED)!!
+        val headscaleControlUrl = findPreference<EditTextPreference>(Key.HEADSCALE_CONTROL_URL)!!
+        val headscaleNodePrefix = findPreference<EditTextPreference>(Key.HEADSCALE_NODE_PREFIX)!!
+        val headscaleNodeNamePreview = findPreference<Preference>("headscaleNodeNamePreview")!!
+        val headscaleAuthKey = findPreference<EditTextPreference>(Key.HEADSCALE_AUTH_KEY)!!
+        val headscaleAcceptRoutes = findPreference<SwitchPreference>(Key.HEADSCALE_ACCEPT_ROUTES)!!
+        val headscaleAdditionalRoutes = findPreference<EditTextPreference>(Key.HEADSCALE_ADDITIONAL_ROUTES)!!
+        val headscaleMagicDnsSuffix = findPreference<EditTextPreference>(Key.HEADSCALE_MAGIC_DNS_SUFFIX)!!
+        val headscaleEphemeral = findPreference<SwitchPreference>(Key.HEADSCALE_EPHEMERAL)!!
+
+        fun updateHeadscaleNodePreview(prefix: String = DataStore.headscaleNodePrefix) {
+            headscaleNodeNamePreview.summary = HeadscaleConfig.nodeName(
+                prefix,
+                HeadscaleConfig.deviceName(requireContext()),
+            )
+        }
+        updateHeadscaleNodePreview()
+        headscaleControlUrl.setOnPreferenceChangeListener { _, newValue ->
+            val valid = (newValue as String).trim().toHttpUrlOrNull() != null
+            if (!valid) {
+                Toast.makeText(requireContext(), R.string.headscale_invalid_url, Toast.LENGTH_LONG).show()
+                false
+            } else {
+                needReload()
+                true
+            }
+        }
+        headscaleNodePrefix.setOnPreferenceChangeListener { _, newValue ->
+            updateHeadscaleNodePreview(newValue as String)
+            needReload()
+            true
+        }
+        fun updateHeadscaleRoutePreference(enabled: Boolean = headscaleEnabled.isChecked,
+                                           acceptRoutes: Boolean = headscaleAcceptRoutes.isChecked) {
+            headscaleAdditionalRoutes.isEnabled = enabled && acceptRoutes
+        }
+        updateHeadscaleRoutePreference()
+        headscaleEnabled.setOnPreferenceChangeListener { _, newValue ->
+            updateHeadscaleRoutePreference(newValue as Boolean)
+            needReload()
+            true
+        }
+        headscaleAcceptRoutes.setOnPreferenceChangeListener { _, newValue ->
+            updateHeadscaleRoutePreference(acceptRoutes = newValue as Boolean)
+            needReload()
+            true
+        }
+        headscaleAuthKey.onPreferenceChangeListener = reloadListener
+        headscaleAdditionalRoutes.onPreferenceChangeListener = reloadListener
+        headscaleMagicDnsSuffix.onPreferenceChangeListener = reloadListener
+        headscaleEphemeral.onPreferenceChangeListener = reloadListener
 
         val logLevel = findPreference<LongClickListPreference>(Key.LOG_LEVEL)!!
         val mtu = findPreference<MTUPreference>(Key.MTU)!!

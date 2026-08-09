@@ -118,6 +118,15 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var enableDnsRouting by configurationStore.boolean(Key.ENABLE_DNS_ROUTING) { true }
     var enableFakeDns by configurationStore.boolean(Key.ENABLE_FAKEDNS) { true }
 
+    var headscaleEnabled by configurationStore.boolean(Key.HEADSCALE_ENABLED)
+    var headscaleControlUrl by configurationStore.string(Key.HEADSCALE_CONTROL_URL) { "" }
+    var headscaleNodePrefix by configurationStore.string(Key.HEADSCALE_NODE_PREFIX) { "neko" }
+    var headscaleAuthKey by configurationStore.string(Key.HEADSCALE_AUTH_KEY) { "" }
+    var headscaleAcceptRoutes by configurationStore.boolean(Key.HEADSCALE_ACCEPT_ROUTES) { true }
+    var headscaleAdditionalRoutes by configurationStore.string(Key.HEADSCALE_ADDITIONAL_ROUTES) { "" }
+    var headscaleMagicDnsSuffix by configurationStore.string(Key.HEADSCALE_MAGIC_DNS_SUFFIX) { "" }
+    var headscaleEphemeral by configurationStore.boolean(Key.HEADSCALE_EPHEMERAL)
+
     var rulesProvider by configurationStore.stringToInt(Key.RULES_PROVIDER)
     var logLevel by configurationStore.stringToInt(Key.LOG_LEVEL)
     var logBufSize by configurationStore.int(Key.LOG_BUF_SIZE) { 0 }

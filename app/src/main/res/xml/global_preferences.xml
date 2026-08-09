@@ -140,6 +140,61 @@
             app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 
+    <PreferenceCategory app:title="@string/headscale_settings">
+        <SwitchPreference
+            app:defaultValue="false"
+            app:icon="@drawable/ic_hardware_router"
+            app:key="headscaleEnabled"
+            app:summary="@string/headscale_enabled_summary"
+            app:title="@string/headscale_enabled" />
+        <EditTextPreference
+            app:dependency="headscaleEnabled"
+            app:key="headscaleControlUrl"
+            app:summary="@string/headscale_control_url_summary"
+            app:title="@string/headscale_control_url"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="neko"
+            app:dependency="headscaleEnabled"
+            app:key="headscaleNodePrefix"
+            app:title="@string/headscale_node_prefix"
+            app:useSimpleSummaryProvider="true" />
+        <Preference
+            app:dependency="headscaleEnabled"
+            app:key="headscaleNodeNamePreview"
+            app:selectable="false"
+            app:title="@string/headscale_node_name" />
+        <EditTextPreference
+            android:inputType="textPassword"
+            app:dependency="headscaleEnabled"
+            app:key="headscaleAuthKey"
+            app:summary="@string/headscale_auth_key_summary"
+            app:title="@string/headscale_auth_key" />
+        <SwitchPreference
+            app:defaultValue="true"
+            app:dependency="headscaleEnabled"
+            app:key="headscaleAcceptRoutes"
+            app:summary="@string/headscale_accept_routes_summary"
+            app:title="@string/headscale_accept_routes" />
+        <EditTextPreference
+            app:dependency="headscaleAcceptRoutes"
+            app:key="headscaleAdditionalRoutes"
+            app:summary="@string/headscale_additional_routes_summary"
+            app:title="@string/headscale_additional_routes"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:dependency="headscaleEnabled"
+            app:key="headscaleMagicDnsSuffix"
+            app:summary="@string/headscale_magic_dns_suffix_summary"
+            app:title="@string/headscale_magic_dns_suffix"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreference
+            app:dependency="headscaleEnabled"
+            app:key="headscaleEphemeral"
+            app:summary="@string/headscale_ephemeral_summary"
+            app:title="@string/headscale_ephemeral" />
+    </PreferenceCategory>
+
     <PreferenceCategory app:title="@string/cag_dns">
         <EditTextPreference
             app:defaultValue="https://dns.google/dns-query"

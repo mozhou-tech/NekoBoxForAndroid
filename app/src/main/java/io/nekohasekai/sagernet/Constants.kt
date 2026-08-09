@@ -23,6 +23,15 @@ object Key {
     const val ENABLE_DNS_ROUTING = "enableDnsRouting"
     const val ENABLE_FAKEDNS = "enableFakeDns"
 
+    const val HEADSCALE_ENABLED = "headscaleEnabled"
+    const val HEADSCALE_CONTROL_URL = "headscaleControlUrl"
+    const val HEADSCALE_NODE_PREFIX = "headscaleNodePrefix"
+    const val HEADSCALE_AUTH_KEY = "headscaleAuthKey"
+    const val HEADSCALE_ACCEPT_ROUTES = "headscaleAcceptRoutes"
+    const val HEADSCALE_ADDITIONAL_ROUTES = "headscaleAdditionalRoutes"
+    const val HEADSCALE_MAGIC_DNS_SUFFIX = "headscaleMagicDnsSuffix"
+    const val HEADSCALE_EPHEMERAL = "headscaleEphemeral"
+
     const val IPV6_MODE = "ipv6Mode"
 
     const val PROXY_APPS = "proxyApps"

@@ -52,9 +52,14 @@ class VpnService : BaseVpnService(),
 
     @Suppress("EXPERIMENTAL_API_USAGE")
     override fun killProcesses() {
-        conn?.close()
-        conn = null
-        super.killProcesses()
+        try {
+            // Stop sing-box (including the embedded Tailscale engine) before closing its TUN FD.
+            super.killProcesses()
+        } finally {
+            conn?.close()
+            conn = null
+            DataStore.vpnService = null
+        }
     }
 
     override fun onBind(intent: Intent) = when (intent.action) {
@@ -104,8 +109,10 @@ class VpnService : BaseVpnService(),
         }
         builder.addDnsServer(PRIVATE_VLAN4_ROUTER)
 
+        // Headscale subnet routes can overlap RFC1918 ranges, so they must enter the shared TUN.
+        // LAN bypass is moved to a higher-priority sing-box direct rule while Headscale is enabled.
         // route
-        if (DataStore.bypassLan) {
+        if (DataStore.bypassLan && !DataStore.headscaleEnabled) {
             resources.getStringArray(R.array.bypass_private_route).forEach {
                 val subnet = Subnet.fromString(it)!!
                 builder.addRoute(subnet.address.hostAddress!!, subnet.prefixSize)
