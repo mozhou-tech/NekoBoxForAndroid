@@ -37,6 +37,9 @@ object TailnetSocksConfig {
         }
     }
 
+    /** Show only the endpoint, even when a saved URL includes authentication. */
+    fun displayAddress(value: String): String = parse(value).displayAddress()
+
     fun redactCredentials(config: String): String = config.replace(
         Regex(""""(username|password)"\s*:\s*"(?:\\.|[^"\\])*""""),
         "\"$1\": \"***\"",

@@ -522,4 +522,5 @@
     <string name="headscale_socks_invalid">SOCKS5 地址无效，请填写 IP:端口，例如 100.64.1.2:1080。</string>
     <string name="headscale_socks_subscription_paused">已配置 Tailnet SOCKS5 代理，订阅更新已暂停。</string>
     <string name="headscale_socks_active">已配置：订阅节点和订阅更新已暂停。清空此地址并重新连接可恢复使用订阅。</string>
+    <string name="headscale_socks_overview_summary">通过 Tailnet 连接此 SOCKS5 代理，订阅节点和订阅更新已暂停。</string>
 </resources>

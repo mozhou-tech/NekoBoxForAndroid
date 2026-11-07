@@ -53,6 +53,7 @@ import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.databinding.LayoutProfileListBinding
 import io.nekohasekai.sagernet.databinding.LayoutProgressListBinding
+import io.nekohasekai.sagernet.fmt.headscale.TailnetSocksConfig
 import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.fmt.toUniversalLink
 import io.nekohasekai.sagernet.group.GroupUpdater
@@ -133,7 +134,36 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     val alwaysShowAddress by lazy { DataStore.alwaysShowAddress }
 
+    private val showingTailnetSocks: Boolean
+        get() = !select && DataStore.tailnetSocksConfigured
+
+    private fun updateProxyPresentation() {
+        val root = view ?: return
+        val tailnet = showingTailnetSocks
+        root.findViewById<View>(R.id.tailnet_socks_card).isVisible = tailnet
+        groupPager.isGone = tailnet
+        val hideTabs = tailnet || adapter.groupList.size < 2
+        tabLayout.isGone = hideTabs
+        toolbar.elevation = if (hideTabs) 0F else dp2px(4).toFloat()
+        if (!select) {
+            for (index in 0 until toolbar.menu.size()) {
+                toolbar.menu.getItem(index).isVisible = !tailnet
+            }
+        }
+        if (tailnet) {
+            root.findViewById<TextView>(R.id.tailnet_socks_address).text = runCatching {
+                TailnetSocksConfig.displayAddress(DataStore.headscaleSocksUrl)
+            }.getOrElse { getString(R.string.headscale_socks_invalid) }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateProxyPresentation()
+    }
+
     fun getCurrentGroupFragment(): GroupFragment? {
+        if (showingTailnetSocks) return null
         return try {
             childFragmentManager.findFragmentByTag("f" + DataStore.selectedGroup) as GroupFragment?
         } catch (e: Exception) {
@@ -240,11 +270,21 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         }
 
+        view.findViewById<View>(R.id.tailnet_socks_edit).setOnClickListener {
+            (activity as? MainActivity)?.displayFragmentWithId(R.id.nav_settings)
+        }
+        updateProxyPresentation()
+        DataStore.configurationStore.registerChangeListener(this)
         DataStore.profileCacheStore.registerChangeListener(this)
     }
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
         runOnMainDispatcher {
+            if (view == null) return@runOnMainDispatcher
+            if (key == Key.HEADSCALE_SOCKS_URL && !select) {
+                updateProxyPresentation()
+                adapter.reload()
+            }
             // editingGroup
             if (key == Key.PROFILE_GROUP) {
                 val targetId = DataStore.editingGroup
@@ -262,6 +302,7 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     override fun onDestroy() {
+        DataStore.configurationStore.unregisterChangeListener(this)
         DataStore.profileCacheStore.unregisterChangeListener(this)
 
         if (::adapter.isInitialized) {
@@ -344,6 +385,7 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     override fun onMenuItemClick(item: MenuItem): Boolean {
+        if (showingTailnetSocks) return false
         when (item.itemId) {
             R.id.action_scan_qr_code -> {
                 startActivity(Intent(context, ScannerActivity::class.java))
@@ -909,6 +951,16 @@ class ConfigurationFragment @JvmOverloads constructor(
         var groupFragments: HashMap<Long, GroupFragment> = HashMap()
 
         fun reload(now: Boolean = false) {
+            if (showingTailnetSocks) {
+                groupPager.post {
+                    if (showingTailnetSocks) {
+                        groupList.clear()
+                        notifyDataSetChanged()
+                        updateProxyPresentation()
+                    }
+                }
+                return
+            }
 
             if (!select) {
                 groupPager.unregisterOnPageChangeCallback(updateSelectedCallback)
@@ -941,12 +993,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val runFunc = if (now) activity?.let { it::runOnUiThread } else groupPager::post
                 if (runFunc != null) {
                     runFunc {
-                        groupList = newGroupList
+                        groupList = if (showingTailnetSocks) arrayListOf() else newGroupList
                         notifyDataSetChanged()
-                        if (set) groupPager.setCurrentItem(selectedGroupIndex, false)
-                        val hideTab = groupList.size < 2
-                        tabLayout.isGone = hideTab
-                        toolbar.elevation = if (hideTab) 0F else dp2px(4).toFloat()
+                        if (set && !showingTailnetSocks) groupPager.setCurrentItem(selectedGroupIndex, false)
+                        updateProxyPresentation()
                         if (!select) {
                             groupPager.registerOnPageChangeCallback(updateSelectedCallback)
                         }
@@ -983,10 +1033,11 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         override suspend fun groupAdd(group: ProxyGroup) {
             tabLayout.post {
+                if (showingTailnetSocks) return@post
                 groupList.add(group)
 
                 if (groupList.any { !it.ungrouped }) tabLayout.post {
-                    tabLayout.visibility = View.VISIBLE
+                    if (!showingTailnetSocks) tabLayout.visibility = View.VISIBLE
                 }
 
                 notifyItemInserted(groupList.size - 1)

@@ -70,6 +70,13 @@ class TailnetSocksConfigTest {
     }
 
     @Test
+    fun overviewShowsEndpointWithoutSchemeOrCredentials() {
+        assertEquals("100.64.1.2:1080", TailnetSocksConfig.displayAddress("socks5://alice:secret@100.64.1.2:1080"))
+        assertEquals("100.64.1.2:7891", TailnetSocksConfig.displayAddress("100.64.1.2:7891"))
+        assertEquals("[fd7a:115c:a1e0::1]:1080", TailnetSocksConfig.displayAddress("alice:secret@[fd7a:115c:a1e0::1]:1080"))
+    }
+
+    @Test
     fun logRedactionHandlesEscapedQuotes() {
         val redacted = TailnetSocksConfig.redactCredentials("""{"username":"alice","password":"p\"ass","server":"100.64.1.2"}""")
         assertFalse(redacted.contains("alice"))
