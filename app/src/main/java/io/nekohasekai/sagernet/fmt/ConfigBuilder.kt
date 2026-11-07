@@ -9,6 +9,7 @@ import io.nekohasekai.sagernet.database.ProxyEntity.Companion.TYPE_CONFIG
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.fmt.ConfigBuildResult.IndexEntity
 import io.nekohasekai.sagernet.fmt.headscale.HeadscaleConfig
+import io.nekohasekai.sagernet.fmt.headscale.TailnetSocksConfig
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.fmt.hysteria.buildSingBoxOutboundHysteriaBean
 import io.nekohasekai.sagernet.fmt.internal.ChainBean
@@ -61,8 +62,16 @@ class ConfigBuildResult(
 }
 
 fun buildConfig(
-    proxy: ProxyEntity, forTest: Boolean = false, forExport: Boolean = false
+    selectedProxy: ProxyEntity, forTest: Boolean = false, forExport: Boolean = false
 ): ConfigBuildResult {
+
+    val useTailnetSocks = !forTest && !forExport && DataStore.tailnetSocksConfigured
+    if (useTailnetSocks) {
+        require(DataStore.serviceMode == Key.MODE_VPN && DataStore.headscaleEnabled) {
+            "Tailnet SOCKS5 requires VPN mode and the built-in Headscale connection"
+        }
+    }
+    val proxy = if (useTailnetSocks) TailnetSocksConfig.profile(DataStore.headscaleSocksUrl) else selectedProxy
 
     if (proxy.type == TYPE_CONFIG) {
         val bean = proxy.requireBean() as ConfigBean
@@ -82,7 +91,7 @@ fun buildConfig(
     val tagMap = HashMap<Long, String>()
     val globalOutbounds = HashMap<Long, String>()
     val selectorNames = ArrayList<String>()
-    val group = SagerDatabase.groupDao.getById(proxy.groupId)
+    val group = if (useTailnetSocks) null else SagerDatabase.groupDao.getById(proxy.groupId)
 
     fun ProxyEntity.resolveChainInternal(): MutableList<ProxyEntity> {
         val bean = requireBean()
@@ -111,6 +120,7 @@ fun buildConfig(
     }
 
     fun ProxyEntity.resolveChain(): MutableList<ProxyEntity> {
+        if (useTailnetSocks) return mutableListOf(this)
         val thisGroup = SagerDatabase.groupDao.getById(groupId)
         val frontProxy = thisGroup?.frontProxy?.let { SagerDatabase.proxyDao.getById(it) }
         val landingProxy = thisGroup?.landingProxy?.let { SagerDatabase.proxyDao.getById(it) }
@@ -124,12 +134,14 @@ fun buildConfig(
         return list
     }
 
-    val extraRules = if (forTest) listOf() else SagerDatabase.rulesDao.enabledRules()
+    val extraRules = if (forTest) listOf() else SagerDatabase.rulesDao.enabledRules().filter {
+        !useTailnetSocks || it.outbound <= 0L
+    }
     val extraProxies =
         if (forTest) mapOf() else SagerDatabase.proxyDao.getEntities(extraRules.mapNotNull { rule ->
             rule.outbound.takeIf { it > 0 && it != proxy.id }
         }.toHashSet().toList()).associateBy { it.id }
-    val buildSelector = !forTest && group?.isSelector == true && !forExport
+    val buildSelector = !useTailnetSocks && !forTest && group?.isSelector == true && !forExport
     val userDNSRuleList = mutableListOf<DNSRule_DefaultOptions>()
     val domainListDNSDirectForce = mutableListOf<String>()
     val bypassDNSBeans = hashSetOf<AbstractBean>()
@@ -267,6 +279,11 @@ fun buildConfig(
         // init routing object
         route = RouteOptions().apply {
             auto_detect_interface = true
+            // Some endpoints and custom outbounds dial domain names without
+            // carrying an explicit resolver. Use the direct DNS transport as
+            // the safe default so service initialization cannot fail with
+            // "missing domain resolver for domain server address".
+            default_domain_resolver = "dns-direct"
             rules = mutableListOf()
             rule_set = mutableListOf()
         }
@@ -390,7 +407,8 @@ fun buildConfig(
                             buildSingBoxOutboundTuicBean(bean)
 
                         is SOCKSBean ->
-                            buildSingBoxOutboundSocksBean(bean)
+                            if (useTailnetSocks) TailnetSocksConfig.outbound(bean)
+                            else buildSingBoxOutboundSocksBean(bean)
 
                         is ShadowsocksBean ->
                             buildSingBoxOutboundShadowsocksBean(bean)
@@ -790,7 +808,7 @@ fun buildConfig(
             }
         }
 
-        if (!forTest) _hack_custom_config = DataStore.globalCustomConfig
+        if (!forTest && !useTailnetSocks) _hack_custom_config = DataStore.globalCustomConfig
     }.let {
         val configMap = it.asMap()
         Util.mergeJSON(configMap, proxy.requireBean().customConfigJson)

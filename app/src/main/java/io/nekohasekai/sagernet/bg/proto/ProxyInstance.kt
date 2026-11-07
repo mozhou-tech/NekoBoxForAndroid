@@ -5,6 +5,7 @@ import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.ServiceNotification
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.fmt.headscale.HeadscaleConfig
+import io.nekohasekai.sagernet.fmt.headscale.TailnetSocksConfig
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import kotlinx.coroutines.runBlocking
@@ -25,8 +26,12 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
         super.buildConfig()
         lastSelectorGroupId = super.config.selectorGroupId
         //
-        if (notTmp) Logs.d(HeadscaleConfig.redactAuthKey(config.config))
-        if (notTmp && BuildConfig.DEBUG) Logs.d(JavaUtil.gson.toJson(config.trafficMap))
+        if (notTmp) Logs.d(TailnetSocksConfig.redactCredentials(
+            HeadscaleConfig.redactAuthKey(config.config)
+        ))
+        if (notTmp && BuildConfig.DEBUG && config.mainEntId != TailnetSocksConfig.PROFILE_ID) {
+            Logs.d(JavaUtil.gson.toJson(config.trafficMap))
+        }
     }
 
     // only use this in temporary instance

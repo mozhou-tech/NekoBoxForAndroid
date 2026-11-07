@@ -131,6 +131,12 @@ abstract class GroupUpdater {
         }
 
         suspend fun executeUpdate(proxyGroup: ProxyGroup, byUser: Boolean): Boolean {
+            if (DataStore.tailnetSocksConfigured) {
+                if (byUser) GroupManager.userInterface?.onUpdateFailure(
+                    proxyGroup, app.getString(R.string.headscale_socks_subscription_paused)
+                )
+                return false
+            }
             return coroutineScope {
                 if (!updating.add(proxyGroup.id)) cancel()
                 GroupManager.postReload(proxyGroup.id)

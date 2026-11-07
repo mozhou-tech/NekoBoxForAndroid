@@ -12,6 +12,7 @@ import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.ISagerNetService
 import io.nekohasekai.sagernet.aidl.ISagerNetServiceCallback
+import io.nekohasekai.sagernet.fmt.headscale.TailnetSocksConfig
 import io.nekohasekai.sagernet.bg.proto.ProxyInstance
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.SagerDatabase
@@ -178,7 +179,7 @@ class BaseService {
             if (intent.action == Action.SERVICE) data.binder else null
 
         fun reload() {
-            if (DataStore.selectedProxy == 0L) {
+            if (DataStore.selectedProxy == 0L && !DataStore.tailnetSocksConfigured) {
                 stopRunner(false, (this as Context).getString(R.string.profile_empty))
             }
             if (canReloadSelector()) {
@@ -201,6 +202,7 @@ class BaseService {
         }
 
         fun canReloadSelector(): Boolean {
+            if (DataStore.tailnetSocksConfigured) return false
             if ((data.proxy?.config?.selectorGroupId ?: -1L) < 0) return false
             val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy) ?: return false
             val tmpBox = ProxyInstance(ent)
@@ -314,7 +316,10 @@ class BaseService {
 
             val data = data
             if (data.state != State.Stopped) return Service.START_NOT_STICKY
-            val profile = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
+            // Parsing and tailnet validation happen during initialization, where failures are reported.
+            val profile = if (DataStore.tailnetSocksConfigured) {
+                TailnetSocksConfig.serviceProfile()
+            } else SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
             this as Context
             if (profile == null) { // gracefully shutdown: https://stackoverflow.com/q/47337857/2245107
                 data.notification = createNotification("")

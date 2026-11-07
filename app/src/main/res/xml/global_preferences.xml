@@ -170,6 +170,11 @@
             app:key="headscaleAuthKey"
             app:summary="@string/headscale_auth_key_summary"
             app:title="@string/headscale_auth_key" />
+        <EditTextPreference
+            android:inputType="textUri"
+            app:key="headscaleSocksUrl"
+            app:summary="@string/headscale_socks_summary"
+            app:title="@string/headscale_socks_title" />
         <SwitchPreference
             app:defaultValue="true"
             app:dependency="headscaleEnabled"

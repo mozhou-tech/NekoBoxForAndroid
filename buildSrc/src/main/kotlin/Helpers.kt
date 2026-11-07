@@ -12,16 +12,55 @@ import kotlin.system.exitProcess
 
 private val Project.android get() = extensions.getByName<ApplicationExtension>("android")
 
-private lateinit var metadata: Properties
 private lateinit var localProperties: Properties
 
+/** Reserve one patch version per APK/AAB build; persist it only after a successful build. */
 fun Project.requireMetadata(): Properties {
-    if (!::metadata.isInitialized) {
-        metadata = Properties().apply {
-            load(rootProject.file("nb4a.properties").inputStream())
+    val cacheKey = "nb4a.buildMetadata"
+    val extra = rootProject.extensions.extraProperties
+    if (extra.has(cacheKey)) return extra.get(cacheKey) as Properties
+
+    val metadataFile = rootProject.file("nb4a.properties")
+    val originalText = metadataFile.readText()
+    val values = Properties().apply { originalText.reader().use { load(it) } }
+    val producesApp = !gradle.startParameter.isDryRun && gradle.startParameter.taskNames.any {
+        val taskName = it.substringAfterLast(':')
+        taskName == "build" || taskName == "buildNeeded" || taskName == "buildDependents" ||
+            listOf("assemble", "bundle", "package", "install").any { prefix -> taskName.startsWith(prefix) }
+    }
+    if (producesApp) {
+        val previousVersion = values.getProperty("VERSION_NAME")
+        val parts = previousVersion.split('.')
+        require(parts.size == 3 && parts.all { it.toIntOrNull() != null }) {
+            "VERSION_NAME must have the format major.minor.patch"
+        }
+        val nextVersion = "${parts[0]}.${parts[1]}.${Math.addExact(parts[2].toInt(), 1)}"
+        values.setProperty("VERSION_NAME", nextVersion)
+        values.setProperty("VERSION_CODE", Math.addExact(values.getProperty("VERSION_CODE").toInt(), 1).toString())
+        val previewVersion = values.getProperty("PRE_VERSION_NAME")
+        if (previewVersion?.startsWith("pre-$previousVersion-") == true) {
+            values.setProperty("PRE_VERSION_NAME", "pre-$nextVersion-" + previewVersion.removePrefix("pre-$previousVersion-"))
+        }
+        logger.lifecycle("App version: $previousVersion -> $nextVersion")
+        // Test, lint, sync and dry-run invocations do not reserve or persist a version.
+        // Failed packaging can be retried using the same version.
+        @Suppress("DEPRECATION")
+        gradle.buildFinished {
+            if (failure == null) {
+                check(metadataFile.readText() == originalText) {
+                    "nb4a.properties changed during the build; refusing to overwrite it"
+                }
+                var updatedText = originalText
+                for (key in listOf("VERSION_NAME", "VERSION_CODE", "PRE_VERSION_NAME")) {
+                    val value = values.getProperty(key) ?: continue
+                    updatedText = updatedText.replace(Regex("(?m)^$key=[^\r\n]*")) { "$key=$value" }
+                }
+                metadataFile.writeText(updatedText)
+            }
         }
     }
-    return metadata
+    extra.set(cacheKey, values)
+    return values
 }
 
 fun Project.requireLocalProperties(): Properties {
@@ -170,10 +209,7 @@ fun Project.setupApp() {
             reset()
             isEnable = true
             isUniversalApk = false
-            include("armeabi-v7a")
             include("arm64-v8a")
-            include("x86")
-            include("x86_64")
         }
 
         flavorDimensions += "vendor"

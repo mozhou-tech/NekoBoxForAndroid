@@ -1097,6 +1097,13 @@ public class SingBoxOptions {
 
         public Integer default_mark;
 
+        /**
+         * Resolver used when a dialer connects to a domain and the dialer does
+         * not provide its own resolver. Keep this as a string because sing-box
+         * accepts the compact form (for example, "dns-direct").
+         */
+        public String default_domain_resolver;
+
     }
 
 

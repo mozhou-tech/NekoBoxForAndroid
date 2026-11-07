@@ -16,6 +16,8 @@ import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
 import io.nekohasekai.sagernet.fmt.headscale.HeadscaleConfig
+import io.nekohasekai.sagernet.fmt.headscale.TailnetSocksConfig
+import io.nekohasekai.sagernet.bg.SubscriptionUpdater
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.utils.Theme
 import moe.matsuri.nb4a.ui.*
@@ -132,6 +134,33 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         headscaleAdditionalRoutes.onPreferenceChangeListener = reloadListener
         headscaleMagicDnsSuffix.onPreferenceChangeListener = reloadListener
         headscaleEphemeral.onPreferenceChangeListener = reloadListener
+
+        val headscaleSocksUrl = findPreference<EditTextPreference>(Key.HEADSCALE_SOCKS_URL)!!
+        fun updateSocksSummary(configured: Boolean = DataStore.tailnetSocksConfigured) {
+            headscaleSocksUrl.setSummary(if (configured) R.string.headscale_socks_active
+                else R.string.headscale_socks_summary)
+        }
+        updateSocksSummary()
+        headscaleSocksUrl.setOnBindEditTextListener {
+            it.inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_VARIATION_URI
+            it.setSingleLine()
+            it.hint = "100.64.1.2:1080"
+        }
+        headscaleSocksUrl.setOnPreferenceChangeListener { _, newValue ->
+            val value = (newValue as String).trim()
+            if (value.isNotEmpty() && runCatching { TailnetSocksConfig.parse(value) }.isFailure) {
+                Toast.makeText(requireContext(), R.string.headscale_socks_invalid, Toast.LENGTH_LONG).show()
+                false
+            } else {
+                // Persist before rescheduling so the worker observes the new mode.
+                headscaleSocksUrl.text = value
+                updateSocksSummary(value.isNotEmpty())
+                runOnDefaultDispatcher { SubscriptionUpdater.reconfigureUpdater() }
+                needReload()
+                false // Already persisted above.
+            }
+        }
 
         val logLevel = findPreference<LongClickListPreference>(Key.LOG_LEVEL)!!
         val mtu = findPreference<MTUPreference>(Key.MTU)!!

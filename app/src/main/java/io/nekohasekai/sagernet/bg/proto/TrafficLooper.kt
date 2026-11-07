@@ -28,6 +28,7 @@ class TrafficLooper
         val traffic = mutableMapOf<Long, TrafficData>()
         data.proxy?.config?.trafficMap?.forEach { (_, ents) ->
             for (ent in ents) {
+                if (ent.id <= 0L) continue // Transient tailnet gateway has no database row.
                 val item = idMap[ent.id] ?: return@forEach
                 ent.rx = item.rx
                 ent.tx = item.tx

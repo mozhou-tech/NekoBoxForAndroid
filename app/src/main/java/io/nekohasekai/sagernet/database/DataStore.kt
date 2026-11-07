@@ -125,6 +125,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var headscaleAcceptRoutes by configurationStore.boolean(Key.HEADSCALE_ACCEPT_ROUTES) { true }
     var headscaleAdditionalRoutes by configurationStore.string(Key.HEADSCALE_ADDITIONAL_ROUTES) { "" }
     var headscaleMagicDnsSuffix by configurationStore.string(Key.HEADSCALE_MAGIC_DNS_SUFFIX) { "" }
+    var headscaleSocksUrl by configurationStore.string(Key.HEADSCALE_SOCKS_URL) { "" }
+    // A configured gateway owns the exit until explicitly cleared, even if tailnet is disabled.
+    val tailnetSocksConfigured: Boolean get() = headscaleSocksUrl.isNotBlank()
     var headscaleEphemeral by configurationStore.boolean(Key.HEADSCALE_EPHEMERAL)
 
     var rulesProvider by configurationStore.stringToInt(Key.RULES_PROVIDER)

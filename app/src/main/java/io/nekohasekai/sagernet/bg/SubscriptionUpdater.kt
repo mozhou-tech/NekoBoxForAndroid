@@ -23,6 +23,8 @@ object SubscriptionUpdater {
     suspend fun reconfigureUpdater() {
         RemoteWorkManager.getInstance(app).cancelUniqueWork(WORK_NAME)
 
+        if (DataStore.tailnetSocksConfigured) return
+
         val subscriptions = SagerDatabase.groupDao.subscriptions()
             .filter { it.subscription!!.autoUpdate }
         if (subscriptions.isEmpty()) return
@@ -62,6 +64,7 @@ object SubscriptionUpdater {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
 
         override suspend fun doWork(): Result {
+            if (DataStore.tailnetSocksConfigured) return Result.success()
             var subscriptions =
                 SagerDatabase.groupDao.subscriptions().filter { it.subscription!!.autoUpdate }
             if (!DataStore.serviceState.connected) {

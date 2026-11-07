@@ -30,6 +30,7 @@ object Key {
     const val HEADSCALE_ACCEPT_ROUTES = "headscaleAcceptRoutes"
     const val HEADSCALE_ADDITIONAL_ROUTES = "headscaleAdditionalRoutes"
     const val HEADSCALE_MAGIC_DNS_SUFFIX = "headscaleMagicDnsSuffix"
+    const val HEADSCALE_SOCKS_URL = "headscaleSocksUrl"
     const val HEADSCALE_EPHEMERAL = "headscaleEphemeral"
 
     const val IPV6_MODE = "ipv6Mode"
